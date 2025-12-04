@@ -1,0 +1,17 @@
+moduel cursor_sqr(
+	 input  [9:0] xPixel,
+    input  [9:0] yPixel,
+    input        active_pixels,
+
+    // packed RGB {R,G,B}
+    output reg [23:0] vga_color
+	 );
+	 
+	 
+localparam CELL_W = 40; // 640 / 40 = 16
+localparam CELL_H = 30; // 480 / 30 = 16
+
+// What cell am I in
+wire [5:0] xCell   = xPixel / CELL_W;  // 0..15
+wire [5:0] yCell   = yPixel / CELL_H;  // 0..15
+

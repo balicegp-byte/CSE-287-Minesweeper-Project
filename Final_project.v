@@ -102,6 +102,9 @@ assign rst = SW[0];
 wire active_pixels;
 wire[9:0]x;
 wire[9:0]y;
+wire[23:0] vga_color;
+wire[23:0] sqr_color;
+wire[23:0] final_color;
 
 
 //This section was written by Dr. Peter Jamieson
@@ -125,55 +128,19 @@ vga_driver the_vga(
 
 
 
-localparam GRID_W = 16;
-localparam GRID_H = 16;
-
-localparam CELL_W = 40; //640 / 40 = 16
-localparam CELL_H = 30; //480 / 30 = 16
-
-
-// What cell am I in
-wire [5:0] xCell = x / CELL_W;  // 0..15
-wire [5:0] yCell = y / CELL_H;  // 0..15
-
-// Where am I in the cell
-wire [5:0] local_x = x % CELL_W; // 0..39
-wire [5:0] local_y = y % CELL_H; // 0..29
-
-// Check to see if I'm in the board
-wire in_board = (xCell < GRID_W) && (yCell < GRID_H);
-
-
-reg[23:0] vga_color;
-
-//Grid edge
-wire is_grid_line = (local_x == 0) || (local_y == 0);
-
-always @(*)
-begin
-	//black background if nothing happened
-	vga_color = 24'h000000;
-	
-	if(active_pixels && in_board)
-		begin
-			if (is_grid_line)
-			begin
-				vga_color = 24'hFFFFFF;
-			end
-	else
-		begin
-			//Cell color is grey
-			vga_color = 24'h878080;
-		end
-	end
-end
+grid_creation grid(.xPixel(x), 
+						 .yPixel(y), 
+						 .active_pixels(active_pixels), 
+						 .vga_color(vga_color));
+						 
+cursor_sqr sqr(.xPixel(x), 
+						 .yPixel(y), 
+						 .active_pixels(active_pixels), 
+						 .sqr_color(sqr_color));
 
 
 always @(*)
 	begin
-		{VGA_R, VGA_G, VGA_B} = vga_color;
+		{VGA_R, VGA_G, VGA_B} = final_color;
 	end
-	
 endmodule
-
-
