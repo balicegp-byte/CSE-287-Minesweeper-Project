@@ -104,7 +104,7 @@ wire[9:0]x;
 wire[9:0]y;
 wire[23:0] vga_color;
 wire[23:0] sqr_color;
-wire[23:0] final_color;
+reg[23:0] final_color;
 
 
 //This section was written by Dr. Peter Jamieson
@@ -134,13 +134,27 @@ grid_creation grid(.xPixel(x),
 						 .vga_color(vga_color));
 						 
 cursor_sqr sqr(.xPixel(x), 
-						 .yPixel(y), 
-						 .active_pixels(active_pixels), 
-						 .sqr_color(sqr_color));
+					.yPixel(y), 
+					.active_pixels(active_pixels),
+					.rst(rst),
+					.clk(clk),
+					.KEY(KEY),
+					.vga_color(sqr_color));
 
 
 always @(*)
 	begin
 		{VGA_R, VGA_G, VGA_B} = final_color;
 	end
+
+always @(*)
+begin
+	final_color = vga_color;
+	
+	if (sqr_color != 24'h000000)
+		begin
+			final_color = sqr_color;
+		end
+	end
+
 endmodule
