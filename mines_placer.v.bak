@@ -1,0 +1,25 @@
+module mines_placer(
+	input clk,
+	input rst,
+	input[6:0] num_mines, //Number of mines 40
+	input start, //Driven from game_state.v to begin the mine placing process
+	
+	
+	output done
+	);
+	//simple 3 state FSM to place mines. Start will instantiated through the game_state module
+	reg[1:0]S;
+	reg[1:0]NS;
+	//FSM States
+	parameter IDLE = 2'd0;
+				 PLACE = 2'd1;
+				 DONE = 2'd2;
+				 ERROR = 2'd3
+				 
+	always @(posedge clk or negedge rst) begin
+        if (rst == 1'b0) begin
+            S <= IDLE;
+        end else begin
+            S <= NS;
+        end
+    end
