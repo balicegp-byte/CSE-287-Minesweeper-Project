@@ -101,7 +101,8 @@ assign rst = SW[0];
 
 wire show_mines;
 assign show_mines = SW[9]; //debug for showing mines
-
+wire debug_number;
+assign debug_number = SW[8];
 
 wire go;              
 wire [1:0] cond;      
@@ -176,7 +177,7 @@ game_state gs(
     .go(go),
     .cond(cond),
     .play_again(play_again),
-    .sel(sel),
+    .sel(sel_start), 
     .mine_done(mine_done),    
     .mine_start(mine_start),   
     .done(game_done)
@@ -232,10 +233,50 @@ always @(posedge clk or negedge rst) begin
 		end
 	end
 
+//Code for adding the numbers	
+reg revealed_map [0:255];
+integer jj;
+always @(posedge clk or negedge rst) begin
+    if (rst == 1'b0) begin
+        for (jj = 0; jj < 256; jj = jj + 1)
+            revealed_map[jj] <= 1'b0; // clear reveals on reset
+    end else begin
+        // debug: reveal everything when debug_numbers is ON
+        if (debug_number) begin
+            for (jj = 0; jj < 256; jj = jj + 1)
+                revealed_map[jj] <= 1'b1; // show all cells
+        end
+        // later: when you hook sel_sqr to a selector, you'll set revealed_map[cursor_addr] <= 1 here
+    end
+end
+
+
 wire [23:0] mine_color;
 wire [7:0] mine_addr = {yCell[3:0], xCell[3:0]};
 wire mine_present = mine_map[mine_addr];
+wire cell_revealed = debug_number || revealed_map[mine_addr]; // show numbers when debugging or when this cell is revealed
 
+reg [3:0] adj_count;
+integer dx, dy;
+integer ix, iy;
+
+always @(*) begin
+    adj_count = 4'd0;
+    for (dx = -1; dx <= 1; dx = dx + 1) begin
+        for (dy = -1; dy <= 1; dy = dy + 1) begin
+            ix = $signed({1'b0, xCell}) + dx;  // signed temp index
+            iy = $signed({1'b0, yCell}) + dy;  // signed temp index
+
+            if (!(dx == 0 && dy == 0)) begin
+                if (ix >= 0 && ix < GRID_W && iy >= 0 && iy < GRID_H) begin
+                    if (mine_map[{iy[3:0], ix[3:0]}]) begin
+                        adj_count = adj_count + 1'b1;
+                    end
+                end
+            end
+        end
+    end
+end
 
 draw_mines dm(
 		.xPixel(x),
@@ -274,6 +315,21 @@ begin
 	begin
 		final_color = mine_color;
 	end
+	
+	if (cell_revealed && !mine_present) begin
+    case (adj_count)
+        4'd0: final_color = 24'h878080; // 0
+        4'd1: final_color = 24'h0000FF; // 1
+        4'd2: final_color = 24'h008000; // 2
+        4'd3: final_color = 24'hFF0000; // 3
+        4'd4: final_color = 24'h000080; // 4
+        4'd5: final_color = 24'h800000; // 5
+        4'd6: final_color = 24'h008080; // 6
+        4'd7: final_color = 24'h000000; // 7
+        4'd8: final_color = 24'h808080; // 8
+        default: final_color = 24'hFFFFFF;
+    endcase
+end
 	
 	if (sqr_color != 24'h000000)
 		begin

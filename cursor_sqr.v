@@ -129,6 +129,7 @@ always @(*) begin
 					sel_sqr = 1'b1;
 					sel_start = 1'b1;
 				end
+		end
 end
 
 //flag_placer flg_plc() TODO: Come back and instantiate
