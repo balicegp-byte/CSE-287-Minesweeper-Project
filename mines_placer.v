@@ -5,44 +5,60 @@ module mines_placer(
 	input start, //Driven from game_state.v to begin the mine placing process
 	
 	
-	output reg done
+	output reg done,
+	
+	output reg[7:0] mine_mem_addr,
+	output reg mine_mem_in,
+	output reg mine_mem_wren
+	
 	);
 	//simple 3 state FSM to place mines. Start will instantiated through the game_state module
 	reg[1:0]S;
 	reg[1:0]NS;
 	
 	//Memory Signals
-	reg[7:0] mine_mem_addr;
 	wire mine_mem_out;
-	reg mine_mem_in;
-	reg mine_mem_wren;
+	
 	
 	//Other variables
 	reg[5:0] mines_placed;
 	wire[15:0] rand_num;
 	reg begin_place;
 	
-	
+	//stuff for mine_alg
+	wire[5:0] mine_total;
+	wire alg_done;
+	wire [7:0] mine_alg_mem_addr;
+	wire mine_alg_mem_in;
+	wire mine_alg_mem_wren;
 	
 	//Rng for mines
-	mine_lfst rng( .clk(clk),
+	mine_lfsr rng( .clk(clk),
 						.rst(rst),
-						.random_number(rand_num));
+						.random_seed(16'h1A2B),
+						.new_random_seed(1'b0),
+						.random_number_output(1'b1),
+						.random_number(rand_num)
+						);
 	//Mine placing algorithm					
 	mine_algorithm alg( .clk(clk),
 						     .rst(rst),
 							  
+							  .random_number(rand_num),
 						     .start(begin_place),
 							  .num_mines(num_mines),
+							  
+							  .mine_total(mine_total),
+							  .alg_done(alg_done),
 							       
-						     .mine_mem_out(mine_alg_mem_out),
-						     .mine_mem_in(mine_alg_mem_in),
-						     .mine_mem_wren(mine_alg_mem_wren),
+						     .mine_alg_mem_addr(mine_alg_mem_addr),
+						     .mine_alg_mem_in(mine_alg_mem_in),
+						     .mine_alg_mem_wren(mine_alg_mem_wren)
 						   );
 	//FSM States
 	parameter IDLE = 2'd0,
 				 PLACE = 2'd1,
-				 DONE = 2'd2,
+				 DONES = 2'd2,
 				 ERROR = 2'd3;
 				 
 	always @(posedge clk or negedge rst) begin
@@ -60,8 +76,11 @@ module mines_placer(
 						NS = IDLE;
 					else
 						NS = PLACE;
-			PLACE: NS = DONE;
-			DONE: NS = DONE;
+			PLACE: if (alg_done == 1'b1)
+							NS = DONES;
+					 else
+							NS = PLACE;
+			DONES: NS = DONES;
 			default: NS = ERROR;
 		endcase
 	end	
@@ -72,12 +91,22 @@ module mines_placer(
 			mine_mem_addr <= 8'd0;
 			mine_mem_in <= 1'b0;
 			mine_mem_wren <= 1'b0;
+			begin_place <= 1'b0;
 			done <= 1'b0;
 			end
 		else begin
+			begin_place <= 1'b0;
+			mine_mem_wren <= 1'b0;
+			done <= 1'b0;    
 			case (S)
-				PLACE: begin_place <= 1'b1;// starts the mine_algorithm module		
-				DONE: done <= 1'b1;
+				PLACE: begin
+					begin_place <= 1'b1;// starts the mine_algorithm module		
+					mine_mem_addr <= mine_alg_mem_addr;
+					mine_mem_in <= mine_alg_mem_in;
+					mine_mem_wren <= mine_alg_mem_wren;
+					mines_placed <= mine_total;
+					end
+				DONES: done <= 1'b1;
 				default: done <= 1'b0;
 		endcase
 	end

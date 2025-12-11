@@ -1,0 +1,12 @@
+module draw_mines(
+		input clk,
+		input rst,
+		input[9:0] xPixel,
+		input[9:0] yPixel,
+		input active_pixels
+		
+		input mine_present,
+		input show_mines,
+		input reveal,
+		
+		output reg[23:0] vga_color);

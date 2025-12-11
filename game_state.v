@@ -3,9 +3,12 @@ module game_state(
     input        rst,
     input        go,
 	 
-	 input [1:0] cond;
-    input play_again;
-	 input sel;
+	 input [1:0] cond,
+    input play_again,
+	 input sel,
+	 
+	 input mine_done,
+	 output reg mine_start,
 	 
     output reg   done
 );
@@ -16,15 +19,15 @@ module game_state(
  
     // Add more variables as you need them
 
-    parameter START = 3'd0,
-				  WAIT_SEL = 3'd1,
-				  MINE_PLACE = 3'd2,
-				  PLAY = 3'd3,
-				  LOSE_S = 3'd4,
-				  WIN_S = 3'd5,
-				  IF_PLAY_AGAIN = 3'd6,
-				  RST_BOARD = 3'd7,
-				  ERROR = 3'd8;
+    parameter START = 4'd0,
+				  WAIT_SEL = 4'd1,
+				  MINE_PLACE = 4'd2,
+				  PLAY = 4'd3,
+				  LOSE_S = 4'd4,
+				  WIN_S = 4'd5,
+				  IF_PLAY_AGAIN = 4'd6,
+				  RST_BOARD = 4'd7,
+				  ERROR = 4'd8;
 
     // FSM state register
     always @(posedge clk or negedge rst) begin
@@ -49,13 +52,16 @@ module game_state(
 							 else
 								NS = MINE_PLACE;
 								
-				MINE_PLACE: NS = PLAY; //Places the mines
+				MINE_PLACE: if (mine_done == 1'b1)
+										NS = PLAY; //Places the mines
+								else
+										NS = MINE_PLACE;
 				
-				PLAY: if (cond == 1'b0)
+				PLAY: if (cond == 2'd0)
 							NS = PLAY;
-						else if (cond == 1'b1)
+						else if (cond == 2'd1)
 							NS = WIN_S;
-						else if (cond == 1'b2)
+						else if (cond == 2'd2)
 							NS = LOSE_S;
 						else
 							NS = PLAY;
@@ -77,18 +83,14 @@ module game_state(
 
     // Simple placeholder for 'done' so it has a defined value
     always @(*) begin
-        done = (S == WIN) || (S == LOSE);
+        mine_start = 1'b0;                 
+        done       = 1'b0;                 
+
+		  case (S)
+				MINE_PLACE: mine_start = 1'b1; 
+				WIN_S:      done = 1'b1;       
+				LOSE_S:     done = 1'b1;
+		  endcase
     end
 
-endmodule
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
+endmodule	

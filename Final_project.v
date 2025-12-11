@@ -99,6 +99,24 @@ wire rst;
 assign clk = CLOCK_50;
 assign rst = SW[0];
 
+wire show_mines;
+assign show_mines = SW[9]; //debug for showing mines
+
+
+wire go;              
+wire [1:0] cond;      
+wire play_again;      
+wire sel;            
+wire [5:0] num_mines; 
+wire game_done;       
+
+assign go = SW[1];
+assign cond = 2'd0; //replace this later?
+//assign sel = SW[2];
+assign play_again = SW[3];
+assign num_mines = 6'd40;
+
+
 wire active_pixels;
 wire[9:0]x;
 wire[9:0]y;
@@ -132,29 +150,134 @@ grid_creation grid(.xPixel(x),
 						 .yPixel(y), 
 						 .active_pixels(active_pixels), 
 						 .vga_color(vga_color));
-						 
+
+wire sel_start;
+wire place_flag;
+wire sel_sqr;						 
 cursor_sqr sqr(.xPixel(x), 
 					.yPixel(y), 
 					.active_pixels(active_pixels),
 					.rst(rst),
 					.clk(clk),
 					.KEY(KEY),
-					.vga_color(sqr_color));
+					.switch(SW[2]),
+					.vga_color(sqr_color),
+					.sel_start(sel_start), //Drive this to sel_module and game_start to place mines and start game
+					.place_flag(place_flag), //Drive this to flag_placer
+					.sel_sqr(sel_sqr) //Drive this to sel_module to ahve it reveal a single sqr
+					);
+					
+wire mine_start;
+wire mine_done;
+
+game_state gs(
+    .clk(clk),
+    .rst(rst),
+    .go(go),
+    .cond(cond),
+    .play_again(play_again),
+    .sel(sel),
+    .mine_done(mine_done),    
+    .mine_start(mine_start),   
+    .done(game_done)
+);
+
+wire[7:0] mine_mem_addr;
+wire mine_mem_in;
+wire mine_mem_wren;
+
+mines_placer mp(
+    .clk(clk),
+    .rst(rst),
+    .num_mines(num_mines),
+    .start(mine_start),    //Gets this from game_state    
+    .done(mine_done),       //Push this back to game_state  
+	
+	.mine_mem_addr(mine_mem_addr),
+   .mine_mem_in(mine_mem_in),
+   .mine_mem_wren(mine_mem_wren)
+	
+);					
+
+localparam GRID_W = 16;
+localparam GRID_H = 16;
+localparam CELL_W = 40;
+localparam CELL_H = 30;
+
+wire [5:0] xCell = x / CELL_W;
+wire [5:0] yCell = y / CELL_H;
+
+    
+wire [7:0] cell_addr = {yCell[3:0], xCell[3:0]};
 
 
+
+reg mine_map [0:255];
+integer ii;
+always @(posedge clk or negedge rst) begin
+	if (rst == 1'b0)
+		begin
+		for (ii = 0; ii < 256; ii = ii + 1)
+			mine_map[ii] <= 1'b0;
+		end
+		else begin
+			if (mine_mem_wren) begin
+				mine_map[mine_mem_addr] <= mine_mem_in;
+			end
+			
+			/*Hard debug for testing
+			if (show_mines)
+				mine_map[8'h00] <= 1'b1;
+				*/
+		end
+	end
+
+wire [23:0] mine_color;
+wire [7:0] mine_addr = {yCell[3:0], xCell[3:0]};
+wire mine_present = mine_map[mine_addr];
+
+
+draw_mines dm(
+		.xPixel(x),
+		.yPixel(y),
+		.active_pixels(active_pixels),
+		.mine_present(mine_present),
+		
+		.show_mines(show_mines),
+		.reveal(game_done),
+		.vga_color(mine_color)
+		);
+
+//Handles VGA RGB Values for the final colors
 always @(*)
 	begin
 		{VGA_R, VGA_G, VGA_B} = final_color;
 	end
 
+	
+	
+	
+/*Debug*/ 
+assign LEDR[0] = mine_start; 
+assign LEDR[1] = mine_done; 
+assign LEDR[2] = mine_mem_wren; 
+assign LEDR[3] = show_mines; 
+assign LEDR[4] = game_done;
+
+//Picks what color should be appearing on the grid
 always @(*)
 begin
 	final_color = vga_color;
+	
+	
+	if(mine_color != 24'h000000)
+	begin
+		final_color = mine_color;
+	end
 	
 	if (sqr_color != 24'h000000)
 		begin
 			final_color = sqr_color;
 		end
-	end
-
+end
 endmodule

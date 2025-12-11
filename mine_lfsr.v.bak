@@ -8,7 +8,7 @@ module mine_lfsr(
 );
 	
 	reg [127:0] lfsr; //Linear Feedback register
-	wire feedback = lfsr[0] ^ lfsr[2] ^ lfsr[62] ^ lfsr[120] ^ lfsr[127]; //1-bit feedback so the shift is exactly 128 bits and always advances
+	
 	//Design
 	always @(posedge clk or negedge rst)
 	begin
@@ -36,8 +36,19 @@ module mine_lfsr(
 				begin
 					random_number <= lfsr[63:48]; //picked arbitrary sequence
 				end
-					lfsr <= {lfsr[126:0], feedback};
+				else
+				begin
+					lfsr <= {
+						lfsr[126:96],
+						(lfsr[0] ^ lfsr[62] ^ lfsr[120] ^ lfsr[2]),
+						lfsr[62:32],
+						(lfsr[3] ^ lfsr[30] ^ lfsr[111] ^ lfsr[93]),
+						lfsr[30:0],
+						(lfsr[7] ^ lfsr[127] ^ lfsr[112] ^ lfsr[92])
+					};
+				end
+			end
 		end
 	end
-end	
+	
 endmodule
