@@ -11,12 +11,13 @@ module cursor_sqr(
     output reg [23:0] vga_color,
 	 output reg sel_start,
 	 output reg place_flag,
-	 output reg sel_sqr
+	 output reg sel_sqr,
+	 output reg[7:0] cursor_addr
 	 );
 	 
 	 
-localparam GRID_W = 16;
-localparam GRID_H = 16;
+localparam GRID_W = 16; //Old 16
+localparam GRID_H = 16; //Old 16
 
 localparam CELL_W = 40; // 640 / 40 = 16
 localparam CELL_H = 30; // 480 / 30 = 16
@@ -81,7 +82,7 @@ begin
 				begin
 					if (move_tick == 1'b1)
 					begin
-						if (KEY[0] == 1'b0 && cursor_x < 6'd15)
+						if (KEY[0] == 1'b0 && cursor_x < (GRID_W - 1))
 						cursor_x <= cursor_x +1'b1;
 					//AGAIN
 					else if (KEY[1] == 1'b0 && cursor_x > 6'd0)
@@ -90,13 +91,14 @@ begin
 					else if (KEY[2] == 1'b0 && cursor_y > 6'd0)
 						cursor_y <= cursor_y - 1'b1;
 					//AND AGAIN AND AGAIN
-					else if (KEY[3] == 1'b0 && cursor_y < 6'd15)
+					else if (KEY[3] == 1'b0 && cursor_y < (GRID_H - 1))
 						cursor_y <= cursor_y + 1'b1;
 					//AND FINISH
 					end
 				end	
 		end
-end			
+end
+			
 reg key0_d;
 reg key1_d;
 always @(posedge clk or negedge rst) begin
@@ -112,24 +114,30 @@ end
 wire key0_pulse = (key0_d == 1'b1) && (KEY[0] == 1'b0);
 wire key1_pulse = (key1_d == 1'b1) && (KEY[1] == 1'b0);
 	
-//This is always block controls the flag and select input
-always @(*) begin
-
-   place_flag = 1'b0;
-	sel_sqr = 1'b0;
-	sel_start = 1'b0;
+//This always block controls the flag and select input
+always @(posedge clk or negedge rst) begin
+	if (rst == 1'b0) begin
+   place_flag <= 1'b0;
+	sel_sqr <= 1'b0;
+	sel_start <= 1'b0;
+	end else begin
+	place_flag <= 1'b0;
+	sel_sqr <= 1'b0;
+	sel_start <= 1'b0;
+	
 	if (switch == 1'b1)
 		begin
 			if (key0_pulse == 1'b1)
 				begin
-					place_flag = 1'b1;
+					place_flag <= 1'b1;
 				end
 			if (key1_pulse == 1'b1)
 				begin
-					sel_sqr = 1'b1;
-					sel_start = 1'b1;
+					sel_sqr <= 1'b1;
+					sel_start <= 1'b1;
 				end
 		end
+	end
 end
 
 //flag_placer flg_plc() TODO: Come back and instantiate
@@ -149,13 +157,30 @@ begin
 		else 
 		begin
 			//Make the first grid red
-			if (xCell == cursor_x && yCell == cursor_y)
-				vga_color = 24'hF54927;
+			if (xCell == cursor_x && yCell == cursor_y) begin
+				integer dx;
+				integer dy;
+				integer r2;
+				
+				dx = local_x - (CELL_W/2);
+				dy = local_y - (CELL_H/2);
+				r2 = (CELL_H / 3 ) * (CELL_H /3);
+				
+				if (dx*dx + dy*dy <= r2)
+					vga_color = 24'hF54927;
+				else
+					vga_color = 24'h000000;
+				end
 			else
 				vga_color = 24'h000000;
 		end
 	end
 end
 
+//Sets the current address of the cursor
+always @(*)
+	begin
+		cursor_addr = {cursor_y[3:0], cursor_x[3:0]};
+	end
 
 endmodule

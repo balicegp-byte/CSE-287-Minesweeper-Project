@@ -1,0 +1,22 @@
+module play_state(
+	input clk,
+	input rst,
+	
+	input play_en, //Comes from Game State
+	
+	//Stuff from cursor square
+	input sel_sqr,
+	input place_flag,
+	input[7:0] cursor_addr,
+	
+	//Stuff from mine/number/and flag mems
+	input mine_at_cursor, //mine_map[cursor_addr]
+	input revealed_at_cursor, //revealed_map[cursor_addr]
+	input flag_at_cursor, //flag_map[cursor_addr]
+	
+	//win detection
+	input[8:0] reveal_safe_count,
+	input[5:0] num_mines,
+	
+	output[1:0] cond, //Pass into game_state to trigger win/lose
+	out 

@@ -1,0 +1,66 @@
+module board_state (
+    input clk,
+    input rst,
+
+ 
+    input [7:0]  flag_wr_addr,
+    input flag_wr_en,
+    input flag_wr_data,
+    input [7:0]  flag_rd_addr,
+    output flag_rd_data,
+
+   
+    input [7:0]  rev_wr_addr,
+    input rev_wr_en,
+    input  rev_wr_data,
+    input [7:0]  rev_rd_addr,
+    output rev_rd_data,
+
+    
+    input  wire        wr_is_safe,          
+    output reg  [8:0]  reveal_safe_count
+);
+
+    // memories
+    reg flag_map     [0:255];
+    reg revealed_map [0:255];
+
+    integer k;
+    integer j;
+
+    // RESET + WRITES
+    always @(posedge clk or negedge rst) begin
+        if (rst == 1'b0) begin
+            // clear flags
+            for (k = 0; k < 256; k = k + 1)
+                flag_map[k] <= 1'b0;
+
+            // clear reveals
+            for (j = 0; j < 256; j = j + 1)
+                revealed_map[j] <= 1'b0;
+
+            // clear count
+            reveal_safe_count <= 9'd0;
+        end else begin
+            // flag write
+            if (flag_wr_en) begin
+                flag_map[flag_wr_addr] <= flag_wr_data;
+            end
+
+            // reveal write
+            if (rev_wr_en) begin
+                revealed_map[rev_wr_addr] <= rev_wr_data;
+            end
+
+            // safe cell count update
+            if (rev_wr_en && wr_is_safe) begin
+                reveal_safe_count <= reveal_safe_count + 9'd1;
+            end
+        end
+    end
+
+    // COMBINATIONAL READS
+    assign flag_rd_data = flag_map[flag_rd_addr];
+    assign rev_rd_data  = revealed_map[rev_rd_addr];
+
+endmodule

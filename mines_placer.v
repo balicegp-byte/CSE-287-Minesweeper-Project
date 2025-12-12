@@ -4,6 +4,7 @@ module mines_placer(
 	input[5:0] num_mines, //Number of mines 40
 	input start, //Driven from game_state.v to begin the mine placing process
 	
+	input [7:0] safe_center_addr, // {start_y[3:0], start_x[3:0]}
 	
 	output reg done,
 	
@@ -47,6 +48,8 @@ module mines_placer(
 							  .random_number(rand_num),
 						     .start(begin_place),
 							  .num_mines(num_mines),
+							  
+							  .safe_center_addr(safe_center_addr),
 							  
 							  .mine_total(mine_total),
 							  .alg_done(alg_done),

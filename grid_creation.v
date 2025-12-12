@@ -10,8 +10,8 @@ module grid_creation(
     localparam GRID_W = 16;
     localparam GRID_H = 16;
 
-    localparam CELL_W = 40; // 640 / 40 = 16
-    localparam CELL_H = 30; // 480 / 30 = 16
+    localparam CELL_W = 40; // 640/ 8
+    localparam CELL_H = 30; // 480 / 8
 
     // What cell am I in
     wire [5:0] xCell   = xPixel / CELL_W;  // 0..15
@@ -34,7 +34,7 @@ module grid_creation(
         if (active_pixels && in_board) begin
             if (is_grid_line) begin
                 // grid lines white
-                vga_color = 24'hFFFFFF;
+                vga_color = 24'h000000;
             end else begin
                 // cell color is grey
                 vga_color = 24'h878080;

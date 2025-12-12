@@ -1,14 +1,15 @@
-module draw_mines(
-		input[9:0] xPixel,
-		input[9:0] yPixel,
-		input active_pixels,
+draw_flags (
+	input[9:0] xPixel,
+	input[9:0] yPixel,
+	input active_pixels,
+	
+	input place_flag,
 		
-		input mine_present,
-		input show_mines,
-		input reveal,
-		
-		output reg[23:0] vga_color);	
-		
+	output reg[23:0] vga_color
+	);	
+	
+	
+	
 localparam GRID_W = 16;
 localparam GRID_H = 16;
 localparam CELL_W = 40;
@@ -25,17 +26,4 @@ wire [5:0] local_y = yPixel % CELL_H;
 wire in_board = (xCell < GRID_W) && (yCell < GRID_H);
 wire is_grid_line = (local_x == 0) || (local_y == 0);
 
-always @(*) 
-begin
-	vga_color = 24'h000000;
-	
-	if (active_pixels && in_board && !is_grid_line)
-		begin
-			if ((show_mines || reveal) && mine_present)
-				begin
-					vga_color = mine_color;
-				end
-		end
-end
-
-endmodule	
+always(@) 

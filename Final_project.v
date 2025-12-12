@@ -93,6 +93,7 @@ module Final_project( 	//////////// ADC //////////
 	assign	HEX2		=	7'h00;
 	assign	HEX3		=	7'h00;
 	
+//A Ton of wires to hook all my modules together	
 wire clk;
 wire rst;
 
@@ -104,15 +105,14 @@ assign show_mines = SW[9]; //debug for showing mines
 wire debug_number;
 assign debug_number = SW[8];
 
-wire go;              
-wire [1:0] cond;      
+wire go;                    
 wire play_again;      
 wire sel;            
 wire [5:0] num_mines; 
-wire game_done;       
+wire game_done;
+wire [1:0] cond;       
 
 assign go = SW[1];
-assign cond = 2'd0; //replace this later?
 //assign sel = SW[2];
 assign play_again = SW[3];
 assign num_mines = 6'd40;
@@ -125,8 +125,73 @@ wire[23:0] vga_color;
 wire[23:0] sqr_color;
 reg[23:0] final_color;
 
+wire mine_present;
+wire mine_at_cursor;
+wire revealed_at_cursor;
+wire flag_at_cursor;
+wire cell_revealed;
+wire[3:0] adj_count;
+wire[8:0] reveal_safe_count;
 
-//This section was written by Dr. Peter Jamieson
+wire mine_mem_in;
+wire mine_mem_wren;
+
+wire[7:0] flag_mem_addr;
+wire flag_mem_wren;
+wire flag_mem_in;
+
+wire[7:0] ps_reveal_mem_addr;
+wire ps_reveal_mem_wren;
+wire ps_reveal_mem_in;
+
+wire [23:0] flag_color;
+
+wire sel_start;
+wire place_flag;
+wire sel_sqr;	
+wire[7:0] cursor_addr;
+
+wire mine_start;
+wire mine_done;
+
+localparam GRID_W = 16;
+localparam GRID_H = 16;
+localparam CELL_W = 40;
+localparam CELL_H = 30;
+
+wire [5:0] xCell = x / CELL_W;
+wire [5:0] yCell = y / CELL_H;
+
+wire [5:0] local_x = x % CELL_W;              // where we are inside the cell
+wire [5:0] local_y = y % CELL_H;              // where we are inside the cell
+wire is_grid_line = (local_x == 0) || (local_y == 0); // same rule as grid_creation
+ 
+wire [7:0] cell_addr = {yCell[3:0], xCell[3:0]};
+
+wire [23:0] mine_color;
+
+wire [7:0] mine_mem_addr;
+
+wire [23:0] result_color;
+wire [1:0] result;
+
+wire flag_present;
+
+wire play_en;
+wire start_en;
+wire start_done;
+
+wire [7:0] start_cell_addr;
+
+wire [7:0] start_reveal_addr;
+wire       start_reveal_in;
+wire       start_reveal_wren;
+
+wire [7:0] reveal_mem_addr;
+wire       reveal_mem_wren;
+wire       reveal_mem_in;
+
+//VGA Driver and this Instantiation was written by Dr. Peter Jamieson
 vga_driver the_vga(
 .clk(clk),
 .rst(rst),
@@ -152,9 +217,8 @@ grid_creation grid(.xPixel(x),
 						 .active_pixels(active_pixels), 
 						 .vga_color(vga_color));
 
-wire sel_start;
-wire place_flag;
-wire sel_sqr;						 
+
+					 
 cursor_sqr sqr(.xPixel(x), 
 					.yPixel(y), 
 					.active_pixels(active_pixels),
@@ -165,11 +229,11 @@ cursor_sqr sqr(.xPixel(x),
 					.vga_color(sqr_color),
 					.sel_start(sel_start), //Drive this to sel_module and game_start to place mines and start game
 					.place_flag(place_flag), //Drive this to flag_placer
-					.sel_sqr(sel_sqr) //Drive this to sel_module to ahve it reveal a single sqr
+					.sel_sqr(sel_sqr), //Drive this to sel_module to ahve it reveal a single sqr
+					.cursor_addr(cursor_addr)
 					);
 					
-wire mine_start;
-wire mine_done;
+
 
 game_state gs(
     .clk(clk),
@@ -178,20 +242,25 @@ game_state gs(
     .cond(cond),
     .play_again(play_again),
     .sel(sel_start), 
+	 .start_done(start_done),
+	 .cursor_addr(cursor_addr),
     .mine_done(mine_done),    
     .mine_start(mine_start),   
-    .done(game_done)
+    .done(game_done),
+	 .result(result),
+	 .play_en(play_en),
+	 .start_en(start_en),
+	 .start_cell_addr(start_cell_addr)
 );
 
-wire[7:0] mine_mem_addr;
-wire mine_mem_in;
-wire mine_mem_wren;
+
 
 mines_placer mp(
     .clk(clk),
     .rst(rst),
     .num_mines(num_mines),
-    .start(mine_start),    //Gets this from game_state    
+    .start(mine_start),    //Gets this from game_state 
+	 .safe_center_addr(start_cell_addr),
     .done(mine_done),       //Push this back to game_state  
 	
 	.mine_mem_addr(mine_mem_addr),
@@ -200,83 +269,22 @@ mines_placer mp(
 	
 );					
 
-localparam GRID_W = 16;
-localparam GRID_H = 16;
-localparam CELL_W = 40;
-localparam CELL_H = 30;
 
-wire [5:0] xCell = x / CELL_W;
-wire [5:0] yCell = y / CELL_H;
+start_3x3 starter(
+    .clk(clk),
+    .rst(rst),
+    .start_en(start_en),
+    .start_cell_addr(start_cell_addr),  
+    .start_done(start_done),
+    .reveal_mem_addr(start_reveal_addr),
+    .reveal_mem_in(start_reveal_in),
+    .reveal_mem_wren(start_reveal_wren)
+);
 
-    
-wire [7:0] cell_addr = {yCell[3:0], xCell[3:0]};
-
-
-
-reg mine_map [0:255];
-integer ii;
-always @(posedge clk or negedge rst) begin
-	if (rst == 1'b0)
-		begin
-		for (ii = 0; ii < 256; ii = ii + 1)
-			mine_map[ii] <= 1'b0;
-		end
-		else begin
-			if (mine_mem_wren) begin
-				mine_map[mine_mem_addr] <= mine_mem_in;
-			end
-			
-			/*Hard debug for testing
-			if (show_mines)
-				mine_map[8'h00] <= 1'b1;
-				*/
-		end
-	end
-
-//Code for adding the numbers	
-reg revealed_map [0:255];
-integer jj;
-always @(posedge clk or negedge rst) begin
-    if (rst == 1'b0) begin
-        for (jj = 0; jj < 256; jj = jj + 1)
-            revealed_map[jj] <= 1'b0; // clear reveals on reset
-    end else begin
-        // debug: reveal everything when debug_numbers is ON
-        if (debug_number) begin
-            for (jj = 0; jj < 256; jj = jj + 1)
-                revealed_map[jj] <= 1'b1; // show all cells
-        end
-        // later: when you hook sel_sqr to a selector, you'll set revealed_map[cursor_addr] <= 1 here
-    end
-end
-
-
-wire [23:0] mine_color;
-wire [7:0] mine_addr = {yCell[3:0], xCell[3:0]};
-wire mine_present = mine_map[mine_addr];
-wire cell_revealed = debug_number || revealed_map[mine_addr]; // show numbers when debugging or when this cell is revealed
-
-reg [3:0] adj_count;
-integer dx, dy;
-integer ix, iy;
-
-always @(*) begin
-    adj_count = 4'd0;
-    for (dx = -1; dx <= 1; dx = dx + 1) begin
-        for (dy = -1; dy <= 1; dy = dy + 1) begin
-            ix = $signed({1'b0, xCell}) + dx;  // signed temp index
-            iy = $signed({1'b0, yCell}) + dy;  // signed temp index
-
-            if (!(dx == 0 && dy == 0)) begin
-                if (ix >= 0 && ix < GRID_W && iy >= 0 && iy < GRID_H) begin
-                    if (mine_map[{iy[3:0], ix[3:0]}]) begin
-                        adj_count = adj_count + 1'b1;
-                    end
-                end
-            end
-        end
-    end
-end
+// if start_3x3 is writing, give it priority; otherwise use play_state
+assign reveal_mem_addr = start_reveal_wren ? start_reveal_addr : ps_reveal_mem_addr;
+assign reveal_mem_in   = start_reveal_wren ? start_reveal_in   : ps_reveal_mem_in;
+assign reveal_mem_wren = start_reveal_wren | ps_reveal_mem_wren;
 
 draw_mines dm(
 		.xPixel(x),
@@ -289,6 +297,79 @@ draw_mines dm(
 		.vga_color(mine_color)
 		);
 
+
+
+	
+play_state ps (
+			.clk(clk),
+			.rst(rst),
+			.play_en(play_en),
+			.sel_sqr(sel_sqr),
+			.place_flag(place_flag),
+			.cursor_addr(cursor_addr),
+			
+			.mine_at_cursor(mine_at_cursor),
+			.revealed_at_cursor(revealed_at_cursor),
+			.flag_at_cursor(flag_at_cursor),
+			
+			.reveal_safe_count(reveal_safe_count),
+			.num_mines(num_mines),
+			.cond(cond),
+			
+			.flag_mem_addr(flag_mem_addr),
+			.flag_mem_wren(flag_mem_wren),
+			.flag_mem_in(flag_mem_in),
+			
+			.reveal_mem_addr(ps_reveal_mem_addr),
+			.reveal_mem_wren(ps_reveal_mem_wren),
+			.reveal_mem_in(ps_reveal_mem_in)
+			);
+			
+			
+draw_flag df(
+		.xPixel(x),
+		.yPixel(y),
+		.active_pixels(active_pixels),
+		.flag_here(flag_present),
+		.vga_color(flag_color)
+		);
+
+
+board_state bs( //for bullshit hardy har har
+			.clk(clk),
+			.rst(rst),
+			.debug_number(debug_number),
+			.mine_wr_addr(mine_mem_addr),
+			.mine_wr_data(mine_mem_in),
+			.mine_wr_en(mine_mem_wren),
+
+			.flag_wr_addr(flag_mem_addr),
+			.flag_wr_data(flag_mem_in),
+			.flag_wr_en(flag_mem_wren),
+
+			.reveal_wr_addr(reveal_mem_addr),
+			.reveal_wr_data(reveal_mem_in),
+			.reveal_wr_en(reveal_mem_wren),
+
+			.xCell(xCell),
+			.yCell(yCell),
+			.cursor_addr(cursor_addr),
+
+			.mine_present(mine_present),
+			.mine_at_cursor(mine_at_cursor),
+		   .revealed_at_cursor(revealed_at_cursor),
+			.flag_at_cursor(flag_at_cursor),
+			.cell_revealed(cell_revealed),
+			.adj_count(adj_count),
+			.reveal_safe_count(reveal_safe_count),
+			.flag_present(flag_present)
+		);
+		
+win_or_lose wio(
+	.result(cond),
+	.vga_color(result_color)
+	);
+
 //Handles VGA RGB Values for the final colors
 always @(*)
 	begin
@@ -298,42 +379,52 @@ always @(*)
 	
 	
 	
-/*Debug*/ 
-assign LEDR[0] = mine_start; 
+/*Debug*/
+assign LEDR[0] = play_en; 
 assign LEDR[1] = mine_done; 
 assign LEDR[2] = mine_mem_wren; 
 assign LEDR[3] = show_mines; 
 assign LEDR[4] = game_done;
+
 
 //Picks what color should be appearing on the grid
 always @(*)
 begin
 	final_color = vga_color;
 	
-	
 	if(mine_color != 24'h000000)
 	begin
 		final_color = mine_color;
 	end
 	
-	if (cell_revealed && !mine_present) begin
+	//I love colors !!11!1!!11!!11!!1    !!!!
+	if (cell_revealed && !mine_present && !is_grid_line) begin
     case (adj_count)
-        4'd0: final_color = 24'h878080; // 0
+        4'd0: final_color = 24'hFFFFFF; // 0 //For some reason I had this set to grey???????
         4'd1: final_color = 24'h0000FF; // 1
         4'd2: final_color = 24'h008000; // 2
-        4'd3: final_color = 24'hFF0000; // 3
+        4'd3: final_color = 24'hFF0000; // Red is a menance. I WANT PICTURES OF RED. GET ME PICTURES OF THE RED MENANCE
         4'd4: final_color = 24'h000080; // 4
         4'd5: final_color = 24'h800000; // 5
-        4'd6: final_color = 24'h008080; // 6
+        4'd6: final_color = 24'h008080; // 6 
         4'd7: final_color = 24'h000000; // 7
         4'd8: final_color = 24'h808080; // 8
         default: final_color = 24'hFFFFFF;
     endcase
 end
 	
+	if (!cell_revealed && flag_color != 24'h000000)
+		begin
+			final_color = flag_color;
+		end
+		
 	if (sqr_color != 24'h000000)
 		begin
 			final_color = sqr_color;
+		end
+	if(result_color != 24'h000000)
+		begin
+			final_color = result_color;
 		end
 end
 endmodule
